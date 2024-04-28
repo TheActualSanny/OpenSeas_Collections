@@ -21,6 +21,9 @@ class Extract_Collections:
         self._params = {
             'limit' : int(reader['PROGRAM_CONFIG']['LIMIT'])
         }
+
+        self._main_data = []
+
     def write_to_lake(self, data):
         '''A simple function which writes the extracted (raw) data to to a JSON file which acts as a Data Lake.'''
 
@@ -34,15 +37,13 @@ class Extract_Collections:
 
     def extract_json(self):
         '''Extracts the JSON data.'''
-        res = requests.get(self._url, headers = self._headers)
+        res = requests.get(self._url, headers = self._headers, params = self._params)
         return res.content
     
     def get_collection_data(self):
-        '''Gets all of the important information from the extracted data (Collection name, contracts, usernames, etc...). The data will be represented
-        as a dictionary and will be used in other modules' methods to finalize it.'''
-        logger.debug('Extracting collections...')
+        '''Gets all of the important information from the extracted data (Collection name, contracts, usernames, etc...).'''
+
         data = json.loads(self.extract_json())
-        main_data = []
         for collection in data['collections']:
             self.write_to_lake(collection)
             if collection['twitter_username']:
@@ -58,7 +59,19 @@ class Extract_Collections:
                 dict_data = {'collection_name' : collection['name'], 'collection_id' : collection['collection'], 'owner_id' : collection['owner'],
                          'twitter_username' : twittername, 'contracts' : collection['contracts']}
                          
-            main_data.append(dict_data)
-        logger.debug('Collections extracted!')
-        return main_data
+            self._main_data.append(dict_data)
+
+        return data['next']
     
+    def get_all_pages(self):
+        '''This is the main method for pagination. It calls the get_collection_data() method on the N number of pages (Set it in Config)'''
+
+        logger.debug('Extracting collections...')
+        for page in range(int(reader['PROGRAM_CONFIG']['PAGE_COUNT'])):
+            next_id = self.get_collection_data()
+            self._params['next'] = next_id
+
+        logger.debug('Extraction finished!')
+        return self._main_data
+    
+
