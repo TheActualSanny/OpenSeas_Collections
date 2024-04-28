@@ -41,7 +41,7 @@ class Database_Manager:
 
         logger.debug('Inserting the data into the database...')
         self.connector()
-        iter_counter = 0
+
         for item in finalized_data:
             try:
                 contract_address = item['contract_address']
@@ -52,15 +52,9 @@ class Database_Manager:
 
             item_values = (item['collection_name'], item['name'], item['description'], item['image_url'], item['owner_name'],  item['twitter_username'],
                            contract_address, contract_chain)
-            
-            self._cur.execute('SELECT * FROM collection_items WHERE collection = %s', (item['collection_name'],))
-
-            if not self._cur.fetchall() or iter_counter == 0:
-                with self._conn:
-                    self._cur.execute('''INSERT INTO collection_items(collection, name, description, image_url, owner, twitter_username, contract_address, contract_chain)
-                                    VALUES(%s, %s, %s, %s, %s, %s, %s, %s)''', item_values)
-                iter_counter += 1
-            
+            with self._conn:
+                self._cur.execute('''INSERT INTO collection_items(collection, name, description, image_url, owner, twitter_username, contract_address, contract_chain)
+                                  VALUES(%s, %s, %s, %s, %s, %s, %s, %s)''', item_values)
+        
         logger.debug('Data successfully inserted!')
                 
-
