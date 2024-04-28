@@ -15,9 +15,5 @@ def main():
     nft_data = items.get_nfts(owner_data)
     manager.insert_data(nft_data)
 
-# if __name__ == '__main__':
-#     main() 
-
-test = [1, 2, 3, 4]
-for i, b in enumerate(test):
-    print(b)
+if __name__ == '__main__':
+    main() 
