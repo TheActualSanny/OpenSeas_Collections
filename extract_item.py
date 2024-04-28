@@ -7,7 +7,7 @@ import time
 from configparser import ConfigParser
 from main_logger import logger
 
-lock = threading.Lock()
+lock = threading.RLock()
 
 reader = ConfigParser()
 reader.read('config.ini')
@@ -38,7 +38,9 @@ class Extract_ColItems():
         raw_data = self.extract_json(collection['collection_id'])
         data = json.loads(raw_data)
         if data:
+            lock.acquire()
             self.write_to_lake(data['nfts'])
+            lock.release()
         del collection['collection_id']
         
         if not data['nfts']:
@@ -71,12 +73,21 @@ class Extract_ColItems():
         '''The Main loop, which gets all of the NFTs via Multithreading'''
         time.sleep(60)
         logger.debug('Extracting NFTs...')
-        threads = [threading.Thread(target = self.get_item_data, args = (i, )) for i in collection_data]
+        length = len(collection_data)
+        last_ind = 0
+        for col in range(99, length, 100):
+            current_data = collection_data[last_ind : col + 1]
+            threads = [threading.Thread(target = self.get_item_data, args = (i, )) for i in current_data]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
 
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
+            if length != 100 and col != length - 1:
+                last_ind = col + 1
+                logger.debug('Sleeping for a minute for the API...')
+                time.sleep(60)
+                logger.debug('Continued the extraction...')
 
         logger.debug('Successfully extracted the NFTs!')
         return self.finalized_nfts
