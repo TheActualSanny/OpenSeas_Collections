@@ -10,12 +10,14 @@ def main():
     items = Extract_ColItems()
     owners = Extract_Owners()
     manager = Database_Manager()
-    collections = cols.get_collection_data()
-    print(len(collections))
+    collections = cols.get_all_pages()
     owner_data = owners.get_owners(collections)
-    print(owner_data)
     nft_data = items.get_nfts(owner_data)
     manager.insert_data(nft_data)
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main() 
+
+test = [1, 2, 3, 4]
+for i, b in enumerate(test):
+    print(b)
