@@ -1,5 +1,7 @@
 import psycopg2
 from configparser import ConfigParser
+
+import psycopg2.sql
 from main_logger import logger
 
 reader = ConfigParser()
@@ -25,6 +27,22 @@ class Cust_ORM:
         self.selected_table = None
 
         self.insertion_id = 1
+
+    def column_checker(self, columnname):
+        '''This is used in all of the methods which deal with columns in order to catch exceptions'''
+        try:
+            self._cur.execute('SELECT {}  FROM {}'.format(columnname, self.selected_table))
+        except psycopg2.errors.UndefinedColumn:
+            raise ValueError('Please make sure to input a valid column name which is in the table!')
+
+
+    def type_validator(self, column_name, given_type):
+        '''Also used for catching exceptions'''
+        try:
+            self._cur.execute('ALTER TABLE {} ALTER COLUMN {} TYPE {};'.format(self.selected_table, column_name, given_type))
+        except psycopg2.errors.UndefinedObject:
+            raise ValueError('Make sure to pass in correct data types!')
+        
 
     def finalized_query(self, *conditions):
         '''This is used in the SELECT methods. Basically, it checks which params the user passed to the select method (ILIKE, LIKE or IN)'''
@@ -56,7 +74,9 @@ class Cust_ORM:
     
     def create_table(self, **columns):
         '''Creates a new table in the database. The user passes the columns (and the value types) as key-value pairs.'''
-
+        if 'table_name' not in columns:
+            raise ValueError('Make sure to pass the table_name as an argument!')
+        
         name = columns['table_name']
         del columns['table_name']
         length = len(columns)
@@ -66,9 +86,15 @@ class Cust_ORM:
         self.initialized_tables[name] = insertion_query
 
         base = '{} {},'
-        query = ''.join(['{} {}'.format(i, columns[i]) if b == length - 1 else base.format(i, columns[i]) for b, i in enumerate(columns)])
+        query = []
+        for b, i in enumerate(columns):
+            if b < length - 1:
+                query.append('{} {}, '.format(i, columns[i]))
+            else:
+                query.append('{} {}'.format(i, columns[i]))
+
         with self._conn:
-            self._cur.execute('CREATE TABLE IF NOT EXISTS {}({})'.format(name, query))
+            self._cur.execute('CREATE TABLE IF NOT EXISTS {}({})'.format(name, ''.join(query)))
        
 
     def delete_table(self, tablename):
@@ -86,13 +112,15 @@ class Cust_ORM:
     def remove_column(self, columnname):
         ''' The column with the given name is dropped. For not, this doesn't have a checker, but I will add it later '''
 
+        self.column_checker(columnname)
         with self._conn:
             self._cur.execute('ALTER TABLE {} DROP COLUMN {}'.format(self.selected_table, columnname))
 
     
     def change_column(self, columnname, datatype):
         ''' The datatype of the column with the given name is changed. This also doesn't have a checker currently'''
-
+        self.column_checker(columnname)
+        self.type_validator(columnname, datatype)
         with self._conn:
             self._cur.execute('ALTER TABLE {} ALTER COLUMN {} TYPE {};'.format(self.selected_table, columnname, datatype))
 
@@ -100,13 +128,15 @@ class Cust_ORM:
     def select_column(self, columnname):
         '''Retrieves data from the given column '''
 
-        self._cur.execute('SELECT {}  FROM {}'.format(columnname, self.selected_table))
+        self.column_checker(columnname)        
         return self._cur.fetchall()
     
 
     def insert_rows(self, given_data, **params):
         '''Inserts the given row/s in the table. The data is passed as a list of tuples (NFTs in our case)'''
-
+  
+        if not params:
+            raise ValueError('Please make sure to pass in a list/tuple of dictionaries as an argument.')
         logger.debug('Inserting the rows...')
         query = '''INSERT INTO {} VALUES({})'''.format(self.selected_table, self.initialized_tables[self.selected_table])
         if 'has_id' in params:
@@ -156,7 +186,15 @@ class Cust_ORM:
             in_op = '{} IN {}'.format(conditions['column'], repr(conditions['in_val']))    
     
         self.finalized_query(ilike, like, in_op)
-        # print('''SELECT * FROM {} {} {}'''.format(self.selected_table, '' if not limit else limit, '' if not order_by else order_by))
-        print('''SELECT * FROM {} {} {} {}'''.format(self.selected_table, self.finalized_query(ilike, like, in_op) ,'' if not order_by else order_by,  '' if not limit else limit))
         self._cur.execute('''SELECT * FROM {} {} {} {}'''.format(self.selected_table, self.finalized_query(ilike, like, in_op) ,'' if not order_by else order_by,  '' if not limit else limit))
         return self._cur.fetchall()
+
+
+test = Cust_ORM()
+
+test.create_table(table_name = 'collection_items',  id = 'SERIAL PRIMARY KEY', collection_name = 'TEXT',  name = 'TEXT', description = 'TEXT', image_url = 'TEXT',
+                      owner_name = 'TEXT', twitter_username = 'TEXT', contract_address = 'TEXT', contract_chain = 'TEXT') 
+                    
+test.select_table('collection_items')
+print(test.change_column('collection_name', 'bomboclat'))
+
