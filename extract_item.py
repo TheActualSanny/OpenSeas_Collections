@@ -13,7 +13,6 @@ reader = ConfigParser()
 reader.read('config.ini')
 
 class Extract_ColItems():
-    
     def __init__(self):
         '''Basic attributes are initialized here.'''
         self._headers = {
